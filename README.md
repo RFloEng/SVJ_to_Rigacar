@@ -31,6 +31,8 @@ camber, toe, track change, caster and Ackermann all come from the SVJ.
 - Suspension **kinematics solved from the SVJ**: every body of the mechanism is driven by tables computed with the SVJ
   loop-closure solver (spec section 26), for wheel travel, steering rack, and heave/roll of shared rigid axles.
 - Wheel travel limited by the SVJ bump / rebound stops.
+- Steering by rack and pinion (slide joint) or by steering box (revolute sector shaft, SVJ >= 0.110); the steering
+  range ends where the SVJ mechanism binds or at 48° of wheel yaw.
 - Springs and dampers rebuilt between their SVJ mounts (stretch-to bones).
 - Legacy SVJ v0.95 `suspension` sections are migrated automatically (`svj.migrate_suspension`).
 - Optional car mesh: a `.glb` next to the SVJ is imported and bound to the body and wheel bones.

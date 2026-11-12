@@ -273,20 +273,31 @@ def extract(path, svj_py=None, n_travel=7, log=print):
                 Rb, _ = fr.rigid(tr[up[s]])
                 ys.append(math.atan2(Rb[1][0], Rb[0][0]))
             return sum(ys) / len(ys)
-        jr = next((c.get("range") for c in cons if c.get("id") == sj), None) or {}
-        rmax = min(max(abs(jr.get("max", 0.12)), abs(jr.get("min", -0.12))), 0.2)
+        jc = next((c for c in cons if c.get("id") == sj), None) or {}
+        jr = jc.get("range") or {}
+        rot = jc.get("joint_type") in ("revolute", "cylindrical")        # steering box: sector shaft angle (rad) instead of rack travel (m)
+        lim, dflt = (1.6, 0.8) if rot else (0.2, 0.12)
+        rmax = min(max(abs(jr.get("max", dflt)), abs(jr.get("min", -dflt))), lim)
+        unit, uf = ("deg", 180.0 / math.pi) if rot else ("mm", 1000.0)
         samples = {0.0: (0.0, ref["transforms"])}
         step = rmax / 12
         for sign in (1, -1):
-            prev = ref["transforms"]
+            prev, prev_r = ref["transforms"], 0.0
             for k in range(1, 13):
-                r_ = sign * k * step
+                r_, shortened = sign * k * step, False
                 r = ls.solve(doc, joint_values={sj: r_}, start=prev)
-                if r["residual"] > ACCEPT_RES:
-                    log(f"WARN: rack {r_*1000:+.0f} mm did not converge; steering range truncated"); break
+                if r["residual"] > ACCEPT_RES:                           # try shorter steps before truncating the range
+                    for frac in (0.5, 0.25):
+                        r_try = prev_r + (r_ - prev_r) * frac
+                        r = ls.solve(doc, joint_values={sj: r_try}, start=prev)
+                        if r["residual"] <= ACCEPT_RES: r_, shortened = r_try, True; break
+                    else:
+                        log(f"WARN: steering input {r_*uf:+.0f} {unit} did not converge; steering range truncated"); break
                 y = yaw_of(r["transforms"])
                 if abs(y) > math.radians(48): break
-                samples[r_] = (y, r["transforms"]); prev = r["transforms"]
+                samples[r_] = (y, r["transforms"]); prev, prev_r = r["transforms"], r_
+                if shortened:                                            # the mechanism binds just beyond this point
+                    log(f"NOTE: steering mechanism binds near {r_*uf:+.0f} {unit}; steering range ends there"); break
         seq = sorted(samples.items(), key=lambda kv: kv[1][0])
         dedup, last = [], None
         for rk, (y, tr) in seq:
@@ -296,8 +307,9 @@ def extract(path, svj_py=None, n_travel=7, log=print):
             record("steer", y, tr)
         out["steer"] = dict(joint=sj, stations=steered, max_yaw=max(abs(d[1]) for d in dedup),
                             rack=[d[0] for d in dedup], yaw=[d[1] for d in dedup])
-        out["report"].append("steering: rack %+.0f..%+.0f mm -> wheel yaw %+.1f..%+.1f deg"
-                             % (dedup[0][0] * 1000, dedup[-1][0] * 1000, math.degrees(dedup[0][1]), math.degrees(dedup[-1][1])))
+        out["report"].append("steering (%s %s): %+.0f..%+.0f %s -> wheel yaw %+.1f..%+.1f deg"
+                             % ("sector shaft" if rot else "rack", sj, dedup[0][0] * uf, dedup[-1][0] * uf, unit,
+                                math.degrees(dedup[0][1]), math.degrees(dedup[-1][1])))
     else:
         out["report"].append("WARN: no steering joint on the front stations: the rig steers with the template's parallel steering only")
 
