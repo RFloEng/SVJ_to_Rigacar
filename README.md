@@ -48,7 +48,7 @@ camber, toe, track change, caster and Ackermann all come from the SVJ.
   so a few lines are patched at runtime on a temporary copy (see `rigacar_template.py`).
 - The `svj-py` folder of the [SVJ repository](https://github.com/RFloEng/SVJ-standard-vehicle-json) (the solver). It is
   bundled into the add-on zip when you build it.
-- An SVJ file with `wheel_stations` for the four wheels `FL FR RL RR` (or a legacy v0.95 `suspension` section).
+- An SVJ file (any version; frame ISO 8855 or SAE J670) with `wheel_stations` for the four wheels `FL FR RL RR` (or a legacy v0.95 `suspension` section).
 
 ## Installation (Blender add-on)
 
@@ -132,8 +132,9 @@ available from the panel).
 5. **Mesh / proxies**: optional car mesh binding or proxy geometry.
 
 The Blender frame of the result: the car faces -Y (Rigacar convention), left is +X, Z is up, the rear axle is at y = 0 and
-the front axle at y = -wheelbase. The SVJ uses SAE J670 (X forward, Y right, Z down, origin at the front axle on the
-ground); the conversion handles the change of frame.
+the front axle at y = -wheelbase. SVJ files are read in either reference frame: ISO 8855 (X forward, Y left, Z up; the default since SVJ 0.109) or
+SAE J670 (Y right, Z down; older files). Both have the origin at the front axle on the ground; ISO files are converted
+losslessly with `svj.frame` (a 180° rotation about X) before solving, so legacy and new files give the same rig.
 
 ## What comes from the SVJ
 

@@ -68,13 +68,31 @@ def to_local(Xb, anchor):
     return [list(Rb[0]) + [t[0]], list(Rb[1]) + [t[1]], list(Rb[2]) + [t[2]], [0, 0, 0, 1]]
 
 
+def to_sae(doc, svj_py_dir=None):
+    """The kinematics below are written in SAE J670 (x fwd, y right, z down). SVJ >= 0.109 files are ISO 8855
+    (x fwd, y left, z up): convert them losslessly with svj.frame (180 deg about X). Returns (doc, notes)."""
+    try:
+        from svj import frame as fm
+    except ImportError:                                   # solver older than 0.109: everything is SAE
+        return doc, []
+    notes = []
+    if fm.frame_of(doc) != fm.SAE:
+        doc, nn = fm.convert(doc, fm.SAE)
+        notes.append("NOTE: file is ISO 8855 (SVJ >= 0.109); converted to SAE J670 internally")
+        notes += list(nn or [])
+    for w in fm.frame_findings(doc):
+        notes.append("WARN: " + w)
+    return doc, notes
+
+
 def load_model(path, svj_py=None):
     ls, cc, ms = import_svj(svj_py)
     doc = json.load(open(path, encoding="utf-8"))
     notes = []
     if not doc.get("wheel_stations"):
         doc, notes = ms.migrate(doc)
-    return ls, cc, doc, notes
+    doc, fnotes = to_sae(doc)
+    return ls, cc, doc, list(notes) + fnotes
 
 
 def _moved(Xs, anchor):
